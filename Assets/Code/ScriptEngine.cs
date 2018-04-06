@@ -1,80 +1,192 @@
-﻿using System;
-using UnityEngine;
-using System.Collections;
+﻿using UnityEngine;
+using System.Collections.Generic;
+using System.Threading;
 using IronPython.Hosting;
-using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Python script engine wrapper which contain the Python scope used in an
 /// application.
 /// </summary>
-public class ScriptEngine
+public class ScriptEngine : MonoBehaviour
 {
-    private Microsoft.Scripting.Hosting.ScriptEngine _engine;
+    
+    #region Fields
 
-    // Main scope
+    private Microsoft.Scripting.Hosting.ScriptEngine _engine;
     private Microsoft.Scripting.Hosting.ScriptScope _mainScope;
 
-    public delegate void LogToConsole(string message);
-    public event LogToConsole _logToConsole;
-    
-    /// <summary>
-    /// Constructor. Creates a Python engine and a main scope where scripts can
-    /// be executed. Also creates modules that can be added in the main scope.
-    /// The standard output channel is changed in the constructor so that
-    /// logging can be done to the provided console via the LogToConsole
-    /// delegate.
-    /// </summary>
-    /// <param name="logToConsole">
-    /// Function used to log to console. Injected to ScriptEngine.\
-    /// </param>
-    public ScriptEngine(LogToConsole logToConsole)
+    private int _mainThreadId;
+
+    private System.Action<string> _logCallback;
+    private System.Action _joinMainThread;
+    private object _joinLock = new object();
+
+    #endregion
+
+    #region CONSTRUCTOR
+
+    private void Awake()
     {
-        _logToConsole = logToConsole;
+        _mainThreadId = Thread.CurrentThread.ManagedThreadId;
+    }
+    
+    public void Init(System.Action<string> logCallback)
+    {
+        _logCallback = logCallback;
         _engine = Python.CreateEngine();
 
         // Create the main scope
         _mainScope = _engine.CreateScope();
-
+        
         // This expression is used when initializing the scope. Changing the
-        // standard output channel. Needs the function 'write' to be defined.
+        // standard output channel and referencing UnityEngine assembly.
         string initExpression = @"
 import sys
-sys.stdout = standardOutput";
-        _mainScope.SetVariable("standardOutput", this);
+sys.stdout = unity
+import clr
+clr.AddReference(unityEngineAssembly)";
+        _mainScope.SetVariable("unity", new ScriptScope(this));
+        _mainScope.SetVariable("unityEngineAssembly", typeof(UnityEngine.Object).Assembly);
 
         // Run initialization, also executes the main config file.
         ExecuteScript(initExpression);
     }
 
-    public void ExecuteScript(string sourceString)
+    #endregion
+
+    #region Properties
+    
+    public System.Action<string> LogCallback
     {
-        Microsoft.Scripting.Hosting.ScriptSource sourceCode =
-            _engine.CreateScriptSourceFromString(sourceString);
-        try
+        get { return _logCallback; }
+        set { _logCallback = value; }
+    }
+
+    #endregion
+
+    #region Methods
+
+    public void ExecuteScript(string script)
+    {
+        this.ScriptStart(script);
+    }
+
+    public void ExecuteScriptAsync(string script)
+    {
+        ThreadPool.QueueUserWorkItem(this.ScriptStart, script);
+    }
+
+    #endregion
+
+    #region Private Methods For Engine
+
+    private void Update()
+    {
+        System.Action a;
+        lock(_joinLock)
         {
-            sourceCode.Execute(_mainScope);
+            a = _joinMainThread;
+            _joinMainThread = null;
         }
-        catch (Exception e)
+
+        if(a != null)
         {
-            _logToConsole(e.Message);
+            a();
         }
     }
 
-    /// <summary>
-    /// This function is used by the standard output in a scope. When setting
-    /// sys.stdout to 'this', this function will be used for outputs.
-    /// </summary>
-    /// <param name="s">
-    /// String to log to console. Should contain explicit newline characters
-    /// for new lines to take affect.
-    /// </param>
-    public void write(string s)
+    private void ScriptStart(object token)
     {
-        if (_logToConsole != null)
+        try
         {
-            _logToConsole(s);
+            var script = _engine.CreateScriptSourceFromString(token as string);
+            script.Execute(_mainScope);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogException(e);
         }
     }
+
+    #endregion
+
+    #region Special Types
+
+    public class ScriptScope
+    {
+
+        public ScriptEngine engine;
+
+        public ScriptScope(ScriptEngine engine)
+        {
+            this.engine = engine;
+        }
+        
+        public void write(string s)
+        {
+            if (engine._logCallback != null) engine._logCallback(s);
+        }
+
+        public void gotoUnityThread(System.Action callback)
+        {
+            if (callback == null) return;
+
+            if (Thread.CurrentThread.ManagedThreadId == engine._mainThreadId)
+            {
+                callback();
+            }
+            else
+            {
+                lock(engine._joinLock)
+                {
+                    engine._joinMainThread += callback;
+                    System.GC.Collect();
+                }
+            }
+        }
+
+        public void exitUnityThread(System.Action callback)
+        {
+            if (callback == null) return;
+
+            if (Thread.CurrentThread.ManagedThreadId != engine._mainThreadId)
+            {
+                callback();
+            }
+            else
+            {
+                ThreadPool.QueueUserWorkItem((o) =>
+                {
+                    callback();
+                }, null);
+            }
+        }
+
+        public WaitForSeconds wait(float seconds)
+        {
+            return new WaitForSeconds(seconds);
+        }
+        
+        public void coroutine(object f)
+        {
+            if (Thread.CurrentThread.ManagedThreadId != engine._mainThreadId)
+            {
+                this.gotoUnityThread(() =>
+                {
+                    this.coroutine(f);
+                });
+            }
+            else
+            {
+                var e = f as System.Collections.IEnumerator;
+                if (e == null) return;
+
+                engine.StartCoroutine(e);
+            }
+        }
+
+    }
     
+    #endregion
+
 }

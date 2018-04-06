@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2017
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IronPythonUnityDemo-master", "IronPythonUnityDemo-master.csproj", "{F877E941-670E-1C4D-2771-4B52500986AA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F877E941-670E-1C4D-2771-4B52500986AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F877E941-670E-1C4D-2771-4B52500986AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F877E941-670E-1C4D-2771-4B52500986AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F877E941-670E-1C4D-2771-4B52500986AA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

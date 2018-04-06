@@ -1,0 +1,14 @@
+import UnityEngine
+from UnityEngine import Vector3
+import time
+
+def foo():
+	unity.engine.transform.position = Vector3(5,0,0)
+	unity.exitUnityThread(foo2)
+
+def foo2():
+	for x in xrange(0, 5):
+		print 'TestPrint'
+		time.sleep(1)
+
+unity.gotoUnityThread(foo)

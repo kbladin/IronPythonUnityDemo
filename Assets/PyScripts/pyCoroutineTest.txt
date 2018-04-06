@@ -1,0 +1,11 @@
+import UnityEngine
+from UnityEngine import Vector3
+
+def DoWork():
+	yield None
+	print "1"
+	yield unity.wait(5)
+	print "2"
+	unity.engine.transform.position = Vector3(5,0,0)
+
+unity.coroutine(DoWork())

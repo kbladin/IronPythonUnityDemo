@@ -20,8 +20,8 @@ public class ScriptRunner : MonoBehaviour {
             string pythonSource =
                 "import time\n" +
                 "for x in xrange(0, 5):\n" +
-                "    print 'TestPrint'\n" +
-                "    time.sleep(1)\n";
+                "    SomeAction()\n" +
+                "    print 'TestPrint'";
 
             // The issue here is that the whole ExecuteScript will run
             // Until it is finished. I would like to be able to exit it
@@ -31,6 +31,8 @@ public class ScriptRunner : MonoBehaviour {
 
             Debug.Log("Finished running script.");
         }
+
+        _scriptEngine.DoWork();
     }
 
     void printMessage(string s)

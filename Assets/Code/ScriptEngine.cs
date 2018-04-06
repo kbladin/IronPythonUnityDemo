@@ -1,8 +1,6 @@
 ﻿using System;
-using UnityEngine;
-using System.Collections;
 using IronPython.Hosting;
-using UnityEngine.SceneManagement;
+using System.Collections.Generic;
 
 /// <summary>
 /// Python script engine wrapper which contain the Python scope used in an
@@ -16,8 +14,9 @@ public class ScriptEngine
     private Microsoft.Scripting.Hosting.ScriptScope _mainScope;
 
     public delegate void LogToConsole(string message);
-    public event LogToConsole _logToConsole;
-    
+    private event LogToConsole _logToConsole;
+    private List<Action> _thingsToDo = new List<Action>();
+
     /// <summary>
     /// Constructor. Creates a Python engine and a main scope where scripts can
     /// be executed. Also creates modules that can be added in the main scope.
@@ -42,6 +41,7 @@ public class ScriptEngine
 import sys
 sys.stdout = standardOutput";
         _mainScope.SetVariable("standardOutput", this);
+        _mainScope.SetVariable("SomeAction", new Action(SomeAction));
 
         // Run initialization, also executes the main config file.
         ExecuteScript(initExpression);
@@ -61,6 +61,23 @@ sys.stdout = standardOutput";
         }
     }
 
+    public void DoWork()
+    {
+        if (_thingsToDo.Count > 0)
+        {
+            Action a = _thingsToDo[0];
+            _thingsToDo.RemoveAt(0);
+            a();
+        }
+    }
+
+    public void SomeAction()
+    {
+        _thingsToDo.Add(() => {
+            System.Threading.Thread.Sleep(1000);
+        });
+    }
+
     /// <summary>
     /// This function is used by the standard output in a scope. When setting
     /// sys.stdout to 'this', this function will be used for outputs.
@@ -71,10 +88,11 @@ sys.stdout = standardOutput";
     /// </param>
     public void write(string s)
     {
-        if (_logToConsole != null)
-        {
-            _logToConsole(s);
-        }
+        _thingsToDo.Add(() => {
+            if (_logToConsole != null)
+            {
+                _logToConsole(s);
+            }
+        });
     }
-    
 }
